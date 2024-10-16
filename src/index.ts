@@ -95,6 +95,6 @@ export default {
         const sendError = sendErrorResults.filter(chatId => chatId);
 
         const responseMsg = { "rejected": sendError };
-        return Response.json(responseMsg);c
+        return Response.json(responseMsg);
     },
 };
