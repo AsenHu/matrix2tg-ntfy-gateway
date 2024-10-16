@@ -5,15 +5,14 @@ interface NotificationCounts {
 
 async function generateNotificationText(notification: {
     content: {
-        event_id?: string;
-        room_id?: string;
         body?: string
-    }; counts: NotificationCounts; sender_display_name: any; room_name: any; room_alias: any; sender: any; room_id: any;
+    }; event_id?: string; room_id?: string; counts?: NotificationCounts; sender_display_name?: string; room_name?: string; room_alias?: string; sender?: string;
 }) {
     const content = notification.content || {};
     console.log(content)
     const counts = notification.counts || {};
     const senderInfo = notification.sender_display_name || notification.room_name || notification.room_alias || notification.sender || notification.room_id || "你的 Homeserver 没说";
+
     let messageText = `消息通知\n来自: ${senderInfo}\n`;
     if (content.body) {
         messageText += `内容: ${content.body}\n`;
@@ -24,8 +23,8 @@ async function generateNotificationText(notification: {
     if (counts.unread !== undefined) {
         messageText += `未读消息: ${counts.unread}\n`;
     }
-    if (typeof content.room_id === 'string' && typeof content.event_id === 'string') {
-        messageText += `[查看消息](https://matrix.to/#/${content.room_id}/${content.event_id})`;
+    if (typeof notification.room_id === 'string' && typeof notification.event_id === 'string') {
+        messageText += `\n[查看消息](https://matrix.to/#/${notification.room_id}/${notification.event_id})`;
     }
     console.log(messageText)
     return safeContent(messageText.trim());
