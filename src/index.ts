@@ -1,11 +1,21 @@
-async function generateNotificationText(notification) {
+interface NotificationCounts {
+    missed_calls?: number;
+    unread?: number;
+}
+
+async function generateNotificationText(notification: {
+    content: {
+        event_id?: string;
+        room_id?: string;
+        body?: string
+    }; counts: NotificationCounts; sender_display_name: any; room_name: any; room_alias: any; sender: any; room_id: any;
+}) {
     const content = notification.content || {};
     const counts = notification.counts || {};
     const senderInfo = notification.sender_display_name || notification.room_name || notification.room_alias || notification.sender || notification.room_id || "你的 Homeserver 没说";
-    console.log(senderInfo)
-    let messageText = `消息通知\n来自: ${await safeContent(senderInfo)}\n`;
+    let messageText = `消息通知\n来自: ${senderInfo}\n`;
     if (content.body) {
-        messageText += `内容: ${safeContent(content.body)}\n`;
+        messageText += `内容: ${content.body}\n`;
     }
     if (counts.missed_calls !== undefined) {
         messageText += `未接来电: ${counts.missed_calls}\n`;
@@ -13,15 +23,17 @@ async function generateNotificationText(notification) {
     if (counts.unread !== undefined) {
         messageText += `未读消息: ${counts.unread}\n`;
     }
-    messageText += `\n调试信息\n\`\`\`json\n${JSON.stringify(notification, null, 2)}\n\`\`\``;
-    return messageText.trim();
+    if (content.room_id !== undefined && content.event_id !== undefined) {
+        messageText += `[查看消息](https://matrix.to/#/${content.room_id}/${content.event_id})`;
+    }
+    return safeContent(messageText.trim());
 }
 
-async function safeContent(str) {
-    return str.replace(/[.!]/g, match => `\\${match}`);
+function safeContent(str: string) {
+    return str.replace(/[.!]/g, (match: any) => `\\${match}`);
 }
 
-async function sendMessage(app_id, chat_id, text, env, debug) {
+async function sendMessage(app_id: string, chat_id: any, text: string, env: { baseAPI: any; }, debug: any) {
     const expectedAppId = 'chat.nekos.ntfy.tg'; // 替换为预期的 app_id
 
     // 检查 app_id 是否一致
@@ -30,7 +42,6 @@ async function sendMessage(app_id, chat_id, text, env, debug) {
     }
 
     const url = `${env.baseAPI}sendMessage`;
-    console.log(url)
     const payload = {
         text: text,
         chat_id: chat_id,
@@ -60,7 +71,7 @@ async function sendMessage(app_id, chat_id, text, env, debug) {
     }
 
     // 解析响应 JSON
-    const jsonResponse = await response.json();
+    const jsonResponse = await response.json() as { ok: boolean };
 
     // 检查响应内容是否包含 { "ok": "true" }
     if (jsonResponse.ok !== true) {
@@ -70,7 +81,7 @@ async function sendMessage(app_id, chat_id, text, env, debug) {
 }
 
 export default {
-    async fetch(request, env) {
+    async fetch(request: { json: () => any; }, env: any) {
         // 读取请求的内容
         const hsNtfy = await request.json();
         console.log(hsNtfy)
@@ -79,7 +90,7 @@ export default {
         const text = await generateNotificationText(hsNtfy.notification);
 
         // 发送消息
-        const sendErrorPromises = hsNtfy.notification.devices.map(async (element) => {
+        const sendErrorPromises = hsNtfy.notification.devices.map(async (element: { app_id: any; pushkey: any; }) => {
             const app_id = element.app_id;
             const chat_id = element.pushkey;
 
