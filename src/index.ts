@@ -1,4 +1,9 @@
-async function generateNotificationText(notification) {
+interface NotificationCounts {
+    missed_calls?: number;
+    unread?: number;
+}
+
+async function generateNotificationText(notification: { content: { body?: string }; counts: NotificationCounts; sender_display_name: any; room_name: any; room_alias: any; sender: any; room_id: any; }) {
     const content = notification.content || {};
     const counts = notification.counts || {};
     const senderInfo = notification.sender_display_name || notification.room_name || notification.room_alias || notification.sender || notification.room_id || "你的 Homeserver 没说";
@@ -17,11 +22,11 @@ async function generateNotificationText(notification) {
     return messageText.trim();
 }
 
-async function safeContent(str) {
-    return str.replace(/[.!]/g, match => `\\${match}`);
+async function safeContent(str: string) {
+    return str.replace(/[.!]/g, (match: any) => `\\${match}`);
 }
 
-async function sendMessage(app_id, chat_id, text, env, debug) {
+async function sendMessage(app_id: string, chat_id: any, text: string, env: { baseAPI: any; }, debug: any) {
     const expectedAppId = 'chat.nekos.ntfy.tg'; // 替换为预期的 app_id
 
     // 检查 app_id 是否一致
@@ -60,7 +65,7 @@ async function sendMessage(app_id, chat_id, text, env, debug) {
     }
 
     // 解析响应 JSON
-    const jsonResponse = await response.json();
+    const jsonResponse = await response.json() as { ok: boolean };
 
     // 检查响应内容是否包含 { "ok": "true" }
     if (jsonResponse.ok !== true) {
@@ -70,7 +75,7 @@ async function sendMessage(app_id, chat_id, text, env, debug) {
 }
 
 export default {
-    async fetch(request, env) {
+    async fetch(request: { json: () => any; }, env: any) {
         // 读取请求的内容
         const hsNtfy = await request.json();
         console.log(hsNtfy)
@@ -79,7 +84,7 @@ export default {
         const text = await generateNotificationText(hsNtfy.notification);
 
         // 发送消息
-        const sendErrorPromises = hsNtfy.notification.devices.map(async (element) => {
+        const sendErrorPromises = hsNtfy.notification.devices.map(async (element: { app_id: any; pushkey: any; }) => {
             const app_id = element.app_id;
             const chat_id = element.pushkey;
 
