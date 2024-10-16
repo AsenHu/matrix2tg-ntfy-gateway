@@ -11,6 +11,7 @@ async function generateNotificationText(notification: {
     }; counts: NotificationCounts; sender_display_name: any; room_name: any; room_alias: any; sender: any; room_id: any;
 }) {
     const content = notification.content || {};
+    console.log(content)
     const counts = notification.counts || {};
     const senderInfo = notification.sender_display_name || notification.room_name || notification.room_alias || notification.sender || notification.room_id || "你的 Homeserver 没说";
     let messageText = `消息通知\n来自: ${senderInfo}\n`;
@@ -26,6 +27,7 @@ async function generateNotificationText(notification: {
     if (content.room_id !== undefined && content.event_id !== undefined) {
         messageText += `[查看消息](https://matrix.to/#/${content.room_id}/${content.event_id})`;
     }
+    console.log(messageText)
     return safeContent(messageText.trim());
 }
 
