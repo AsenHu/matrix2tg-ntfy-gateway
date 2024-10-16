@@ -9,6 +9,7 @@ async function generateNotificationText(notification: {
     }; event_id?: string; room_id?: string; counts?: NotificationCounts; sender_display_name?: string; room_name?: string; room_alias?: string; sender?: string;
 }) {
     const content = notification.content || {};
+    console.log(content)
     const counts = notification.counts || {};
     const senderInfo = notification.sender_display_name || notification.room_name || notification.room_alias || notification.sender || notification.room_id || "你的 Homeserver 没说";
 
