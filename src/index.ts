@@ -24,7 +24,7 @@ async function generateNotificationText(notification: {
     if (counts.unread !== undefined) {
         messageText += `未读消息: ${counts.unread}\n`;
     }
-    if (content.room_id !== undefined && content.event_id !== undefined) {
+    if (typeof content.room_id === 'string' && typeof content.event_id === 'string') {
         messageText += `[查看消息](https://matrix.to/#/${content.room_id}/${content.event_id})`;
     }
     console.log(messageText)
