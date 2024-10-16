@@ -10,7 +10,7 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
-  - packagge-ecosystem: "npm"
+  - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: weekly
