@@ -23,7 +23,7 @@ async function generateNotificationText(notification: {
         messageText += `未读消息: ${counts.unread}\n`;
     }
     if (typeof notification.room_id === 'string' && typeof notification.event_id === 'string') {
-        messageText += `[查看消息](https://matrix.to/#/${notification.room_id}/${notification.event_id})`;
+        messageText += `\n[查看消息](https://matrix.to/#/${notification.room_id}/${notification.event_id})`;
     }
     console.log(messageText)
     return safeContent(messageText.trim());
