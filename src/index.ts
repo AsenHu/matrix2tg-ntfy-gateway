@@ -3,14 +3,19 @@ interface NotificationCounts {
     unread?: number;
 }
 
-async function generateNotificationText(notification: { content: { body?: string }; counts: NotificationCounts; sender_display_name: any; room_name: any; room_alias: any; sender: any; room_id: any; }) {
+async function generateNotificationText(notification: {
+    content: {
+        event_id?: string;
+        room_id?: string;
+        body?: string
+    }; counts: NotificationCounts; sender_display_name: any; room_name: any; room_alias: any; sender: any; room_id: any;
+}) {
     const content = notification.content || {};
     const counts = notification.counts || {};
     const senderInfo = notification.sender_display_name || notification.room_name || notification.room_alias || notification.sender || notification.room_id || "你的 Homeserver 没说";
-    console.log(senderInfo)
-    let messageText = `消息通知\n来自: ${await safeContent(senderInfo)}\n`;
+    let messageText = `消息通知\n来自: ${senderInfo}\n`;
     if (content.body) {
-        messageText += `内容: ${safeContent(content.body)}\n`;
+        messageText += `内容: ${content.body}\n`;
     }
     if (counts.missed_calls !== undefined) {
         messageText += `未接来电: ${counts.missed_calls}\n`;
@@ -18,11 +23,13 @@ async function generateNotificationText(notification: { content: { body?: string
     if (counts.unread !== undefined) {
         messageText += `未读消息: ${counts.unread}\n`;
     }
-    messageText += `\n调试信息\n\`\`\`json\n${JSON.stringify(notification, null, 2)}\n\`\`\``;
-    return messageText.trim();
+    if (content.room_id !== undefined && content.event_id !== undefined) {
+        messageText += `[查看消息](https://matrix.to/#/${content.room_id}/${content.event_id})`;
+    }
+    return safeContent(messageText.trim());
 }
 
-async function safeContent(str: string) {
+function safeContent(str: string) {
     return str.replace(/[.!]/g, (match: any) => `\\${match}`);
 }
 
@@ -35,7 +42,6 @@ async function sendMessage(app_id: string, chat_id: any, text: string, env: { ba
     }
 
     const url = `${env.baseAPI}sendMessage`;
-    console.log(url)
     const payload = {
         text: text,
         chat_id: chat_id,
