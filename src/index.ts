@@ -60,15 +60,15 @@ async function generateNotificationText(notification: Notification) {
     const counts = notification.counts || {};
     const senderInfo = notification.sender_display_name || notification.room_name || notification.room_alias || notification.sender || notification.room_id || "你的 Homeserver 没说";
 
-    let messageText = `**消息通知**\n**来自:** ${senderInfo}\n`;
+    let messageText = `*消息通知*\n*来自:* ${senderInfo}\n`;
     if (content.body) {
-        messageText += `**内容:** ${content.body}\n`;
+        messageText += `*内容:* ${content.body}\n`;
     }
     if (counts.missed_calls !== undefined) {
-        messageText += `**未接来电:** ${counts.missed_calls}\n`;
+        messageText += `*未接来电:* ${counts.missed_calls}\n`;
     }
     if (counts.unread !== undefined) {
-        messageText += `**未读消息:** ${counts.unread}\n`;
+        messageText += `*未读消息:* ${counts.unread}\n`;
     }
     if (typeof notification.room_id === 'string' && typeof notification.event_id === 'string') {
         messageText += `\n[matrix.to](https://matrix.to/#/${notification.room_id}/${notification.event_id})`;
