@@ -1,7 +1,7 @@
 import sha256 from 'crypto-js/sha256';
 
 interface Env {
-    BINDING_NAME: KVNamespace;
+    kv: KVNamespace;
     baseAPI: string;
     token: string;
 }
@@ -40,7 +40,7 @@ export default {
             const pushkey = element.pushkey;
 
             // 使用 await 发送消息，返回错误的 pushkey
-            const errorPushkey = await sendMessage(app_id, pushkey, textPromise, url, env.token, hsNtfy);
+            const errorPushkey = await sendMessage(app_id, pushkey, textPromise, url, env.token, hsNtfy, env.kv);
             return errorPushkey; // 直接返回发送结果
         });
 
@@ -78,7 +78,7 @@ async function generateNotificationText(notification: Notification) {
     return safeText;
 }
 
-function checkShouldSend(app_id: string, pushkey: string, token: string, hsNtfy: Notification) {
+async function checkShouldSend(app_id: string, pushkey: string, token: string, hsNtfy: Notification, kv: KVNamespace) {
     // 检查 app_id
     const expectedAppId = 'chat.nekos.tgntfy';
     if (app_id !== expectedAppId) {
@@ -98,6 +98,12 @@ function checkShouldSend(app_id: string, pushkey: string, token: string, hsNtfy:
         return 'reject';
     }
 
+    // KV 存储
+    const chatIdKey = await kv.get(chat_id, 'json');
+    if (chatIdKey === null) {
+        await kv.put(chat_id, JSON.stringify({ 'sign': signature, 'time': Date.now() }));
+    }
+
     // 检查是否应该发送消息
     if ((hsNtfy.counts?.unread === 0 || hsNtfy.counts?.unread === 1) && (hsNtfy.counts?.missed_calls === 0 || hsNtfy.counts?.missed_calls === undefined)) {
         return 'nothing';
@@ -106,9 +112,9 @@ function checkShouldSend(app_id: string, pushkey: string, token: string, hsNtfy:
     return chat_id;
 }
 
-async function sendMessage(app_id: string, pushkey: string, promiseText: Promise<string>, url: string, token: string, hsNtfy: Notification) {
+async function sendMessage(app_id: string, pushkey: string, promiseText: Promise<string>, url: string, token: string, hsNtfy: Notification, kv: KVNamespace) {
     // 检查是否应该发送消息并获取 chat_id
-    const action = checkShouldSend(app_id, pushkey, token, hsNtfy);
+    const action = await checkShouldSend(app_id, pushkey, token, hsNtfy, kv);
     if (action === 'nothing') {
         return;
     }
