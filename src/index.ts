@@ -1,102 +1,43 @@
-interface NotificationCounts {
-    missed_calls?: number;
-    unread?: number;
+import sha256 from 'crypto-js/sha256';
+
+interface Env {
+    baseAPI: string;
+    token: string;
 }
 
-async function generateNotificationText(notification: {
+interface Notification {
     content: {
-        body?: string
-    }; event_id?: string; room_id?: string; counts?: NotificationCounts; sender_display_name?: string; room_name?: string; room_alias?: string; sender?: string;
-}) {
-    const content = notification.content || {};
-    console.log(content)
-    const counts = notification.counts || {};
-    const senderInfo = notification.sender_display_name || notification.room_name || notification.room_alias || notification.sender || notification.room_id || "你的 Homeserver 没说";
-
-    let messageText = `消息通知\n来自: ${senderInfo}\n`;
-    if (content.body) {
-        messageText += `内容: ${content.body}\n`;
-    }
-    if (counts.missed_calls !== undefined) {
-        messageText += `未接来电: ${counts.missed_calls}\n`;
-    }
-    if (counts.unread !== undefined) {
-        messageText += `未读消息: ${counts.unread}\n`;
-    }
-    if (typeof notification.room_id === 'string' && typeof notification.event_id === 'string') {
-        messageText += `\n[查看消息](https://matrix.to/#/${notification.room_id}/${notification.event_id})`;
-    }
-    console.log(messageText)
-    return safeContent(messageText.trim());
-}
-
-function safeContent(str: string) {
-    return str.replace(/[.!]/g, (match: any) => `\\${match}`);
-}
-
-async function sendMessage(app_id: string, chat_id: any, text: string, env: { baseAPI: any; }, debug: any) {
-    const expectedAppId = 'chat.nekos.ntfy.tg'; // 替换为预期的 app_id
-
-    // 检查 app_id 是否一致
-    if (app_id !== expectedAppId) {
-        return chat_id; // 返回 chat_id，表示没有发送
-    }
-
-    const url = `${env.baseAPI}sendMessage`;
-    const payload = {
-        text: text,
-        chat_id: chat_id,
-        parse_mode: 'MarkdownV2'
+        body?: string;
     };
-    const err = {
-        chat_id: chat_id,
-        text: `你的推送爆了，快去找开发者看看吧！\n调试信息\n\`\`\`json\n${JSON.stringify(debug, null, 2)}\n\`\`\``,
-        parse_mode: 'MarkdownV2'
+    event_id?: string;
+    room_id?: string;
+    counts?: {
+        missed_calls?: number;
+        unread?: number;
     };
-    const errInit = {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(err)
-    };
-
-    // 使用 await 等待 fetch 请求完成
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-    });
-
-    if (response.status !== 200) {
-        await fetch(url, errInit);
-        return chat_id; // 如果状态码不是 200，返回 chat_id
-    }
-
-    // 解析响应 JSON
-    const jsonResponse = await response.json() as { ok: boolean };
-
-    // 检查响应内容是否包含 { "ok": "true" }
-    if (jsonResponse.ok !== true) {
-        await fetch(url, errInit);
-        return chat_id; // 如果响应里没有 { "ok": "true" }，返回 chat_id
-    }
+    sender_display_name?: string;
+    room_name?: string;
+    room_alias?: string;
+    sender?: string;
 }
 
 export default {
-    async fetch(request: { json: () => any; }, env: any) {
+    async fetch(request, env: Env) {
         // 读取请求的内容
-        const hsNtfy = await request.json();
+        const hsNtfy = request.json().notification;
         console.log(hsNtfy)
 
         // 拼接字符串
-        const text = await generateNotificationText(hsNtfy.notification);
+        const textPromise = generateNotificationText(hsNtfy);
+        const url = `${env.baseAPI}sendMessage`;
 
         // 发送消息
-        const sendErrorPromises = hsNtfy.notification.devices.map(async (element: { app_id: any; pushkey: any; }) => {
+        const sendErrorPromises = hsNtfy.devices.map(async (element: { app_id: any; pushkey: any; }) => {
             const app_id = element.app_id;
-            const chat_id = element.pushkey;
+            const pushkey = element.pushkey;
 
-            // 使用 await 发送消息，返回错误的 chat_id
-            const errorChatId = await sendMessage(app_id, chat_id, text, env, hsNtfy.notification);
+            // 使用 await 发送消息，返回错误的 pushkey
+            const errorChatId = await sendMessage(app_id, pushkey, textPromise, url, env.token);
             return errorChatId; // 直接返回发送结果
         });
 
@@ -110,3 +51,88 @@ export default {
         return Response.json(responseMsg);
     },
 };
+
+async function generateNotificationText(notification: Notification) {
+    const content = notification.content || {};
+    const counts = notification.counts || {};
+    const senderInfo = notification.sender_display_name || notification.room_name || notification.room_alias || notification.sender || notification.room_id || "你的 Homeserver 没说";
+
+    let messageText = `**消息通知**\n**来自:** ${senderInfo}\n`;
+    if (content.body) {
+        messageText += `**内容:** ${content.body}\n`;
+    }
+    if (counts.missed_calls !== undefined) {
+        messageText += `**未接来电:** ${counts.missed_calls}\n`;
+    }
+    if (counts.unread !== undefined) {
+        messageText += `**未读消息:** ${counts.unread}\n`;
+    }
+    if (typeof notification.room_id === 'string' && typeof notification.event_id === 'string') {
+        messageText += `\n[matrix.to](https://matrix.to/#/${notification.room_id}/${notification.event_id})`;
+    }
+    safeText = messageText.replace(/[.!]/g, (match: string) => `\\${match}`).trim();
+    console.log(safeText)
+    return safeText;
+}
+
+function checkShouldSend(app_id: string, pushkey: string, token: string) {
+    // 检查 app_id
+    const expectedAppId = 'chat.nekos.tgntfy';
+    if (app_id !== expectedAppId) {
+        return 'reject';
+    }
+
+    // 检查签名
+    const regex = /^([^:]+):([^:]+)$/; // 匹配格式为 chat_id:single_chat_id
+    const match = pushkey.match(regex);
+    if (!match) {
+        return 'reject';
+    }
+    chat_id = match[1];
+    signature = match[2];
+    const expectedSign = sha256(chat_id + token).toString();
+    if (signature !== expectedSign) {
+        return 'reject';
+    }
+
+    const chat_id = match[1];
+    return chat_id;
+}
+
+async function sendMessage(app_id: string, pushkey: string, promiseText: Promise<string>, url: string, token: string) {
+    // 检查是否应该发送消息并获取 chat_id
+    const action = checkShouldSend(app_id, pushkey);
+    if (action === 'nothing') {
+        return;
+    }
+    if (action === 'reject') {
+        return pushkey;
+    }
+    chat_id = action;
+
+    const text = await promiseText;
+    const payload = {
+        text: text,
+        chat_id: chat_id,
+        parse_mode: 'MarkdownV2'
+    };
+
+    // 使用 await 等待 fetch 请求完成
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+
+    if (response.status !== 200) {
+        return chat_id; // 如果状态码不是 200，返回 chat_id
+    }
+
+    // 解析响应 JSON
+    const jsonResponse = await response.json() as { ok: boolean };
+
+    // 检查响应内容是否包含 { "ok": "true" }
+    if (jsonResponse.ok !== true) {
+        return chat_id; // 如果响应里没有 { "ok": "true" }，返回 chat_id
+    }
+}
