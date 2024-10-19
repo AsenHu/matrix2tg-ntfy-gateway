@@ -40,15 +40,15 @@ export default {
             const pushkey = element.pushkey;
 
             // 使用 await 发送消息，返回错误的 pushkey
-            const errorChatId = await sendMessage(app_id, pushkey, textPromise, url, env.token, hsNtfy);
-            return errorChatId; // 直接返回发送结果
+            const errorPushkey = await sendMessage(app_id, pushkey, textPromise, url, env.token, hsNtfy);
+            return errorPushkey; // 直接返回发送结果
         });
 
         // 使用 Promise.all 来等待所有发送消息任务完成
         const sendErrorResults = await Promise.all(sendErrorPromises);
 
         // 使用 filter 方法过滤掉空字符串、null 和 undefined
-        const sendError = sendErrorResults.filter((chatId: string | undefined) => chatId);
+        const sendError = sendErrorResults.filter((pushkey: string | undefined) => pushkey);
 
         const responseMsg = { "rejected": sendError };
         return Response.json(responseMsg);
@@ -132,7 +132,7 @@ async function sendMessage(app_id: string, pushkey: string, promiseText: Promise
     });
 
     if (response.status !== 200) {
-        return chat_id; // 如果状态码不是 200，返回 chat_id
+        return pushkey; // 如果状态码不是 200，返回 pushkey
     }
 
     // 解析响应 JSON
@@ -140,6 +140,6 @@ async function sendMessage(app_id: string, pushkey: string, promiseText: Promise
 
     // 检查响应内容是否包含 { "ok": "true" }
     if (jsonResponse.ok !== true) {
-        return chat_id; // 如果响应里没有 { "ok": "true" }，返回 chat_id
+        return pushkey; // 如果响应里没有 { "ok": "true" }，返回 pushkey
     }
 }
