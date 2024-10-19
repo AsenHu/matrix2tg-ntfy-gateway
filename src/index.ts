@@ -19,12 +19,14 @@ interface Notification {
     room_name?: string;
     room_alias?: string;
     sender?: string;
+    devices: Array<{ app_id: string; pushkey: string; }>;
 }
 
 export default {
-    async fetch(request, env: Env) {
+    async fetch(request: Request, env: Env) {
         // 读取请求的内容
-        const hsNtfy = request.json().notification;
+        const requestBody: { notification: Notification } = await request.json();
+        const hsNtfy = requestBody.notification;
         console.log(hsNtfy)
 
         // 拼接字符串
@@ -44,8 +46,8 @@ export default {
         // 使用 Promise.all 来等待所有发送消息任务完成
         const sendErrorResults = await Promise.all(sendErrorPromises);
 
-        // 过滤出所有发送失败的 chat_id
-        const sendError = sendErrorResults.filter(chatId => chatId);
+        // 使用 filter 方法过滤掉空字符串、null 和 undefined
+        const sendError = sendErrorResults.filter((chatId: string | undefined) => chatId);
 
         const responseMsg = { "rejected": sendError };
         return Response.json(responseMsg);
@@ -70,7 +72,7 @@ async function generateNotificationText(notification: Notification) {
     if (typeof notification.room_id === 'string' && typeof notification.event_id === 'string') {
         messageText += `\n[matrix.to](https://matrix.to/#/${notification.room_id}/${notification.event_id})`;
     }
-    safeText = messageText.replace(/[.!]/g, (match: string) => `\\${match}`).trim();
+    const safeText = messageText.replace(/[.!]/g, (match: string) => `\\${match}`).trim();
     console.log(safeText)
     return safeText;
 }
@@ -88,27 +90,26 @@ function checkShouldSend(app_id: string, pushkey: string, token: string) {
     if (!match) {
         return 'reject';
     }
-    chat_id = match[1];
-    signature = match[2];
+    const chat_id = match[1];
+    const signature = match[2];
     const expectedSign = sha256(chat_id + token).toString();
     if (signature !== expectedSign) {
         return 'reject';
     }
 
-    const chat_id = match[1];
     return chat_id;
 }
 
 async function sendMessage(app_id: string, pushkey: string, promiseText: Promise<string>, url: string, token: string) {
     // 检查是否应该发送消息并获取 chat_id
-    const action = checkShouldSend(app_id, pushkey);
+    const action = checkShouldSend(app_id, pushkey, token);
     if (action === 'nothing') {
         return;
     }
     if (action === 'reject') {
         return pushkey;
     }
-    chat_id = action;
+    const chat_id = action;
 
     const text = await promiseText;
     const payload = {
