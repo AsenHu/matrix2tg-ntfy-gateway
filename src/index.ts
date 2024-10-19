@@ -23,6 +23,11 @@ interface Notification {
     devices: Array<{ app_id: string; pushkey: string; }>;
 }
 
+interface ChatIdKey {
+    sign: string;
+    time: number;
+}
+
 export default {
     async fetch(request: Request, env: Env) {
         // 读取请求的内容
@@ -85,7 +90,7 @@ async function checkShouldSend(app_id: string, pushkey: string, token: string, h
         return 'reject';
     }
 
-    // 检查签名
+    // 分割 chat_id 和 signature
     const regex = /^([^:]+):([^:]+)$/; // 匹配格式为 chat_id:single_chat_id
     const match = pushkey.match(regex);
     if (!match) {
@@ -93,20 +98,30 @@ async function checkShouldSend(app_id: string, pushkey: string, token: string, h
     }
     const chat_id = match[1];
     const signature = match[2];
-    const expectedSign = sha256(chat_id + token).toString();
+    // KV 存储检查签名
+    const chatIdKey: ChatIdKey | null = await kv.get(chat_id, 'json');
+    if (chatIdKey === null) {
+        return 'reject';
+    }
+    const expectedSign = chatIdKey.sign;
+    const lastSendTime = chatIdKey.time;
+    const timeDiff = Date.now() - lastSendTime;
     if (signature !== expectedSign) {
         return 'reject';
     }
 
-    // KV 存储
-    const chatIdKey = await kv.get(chat_id, 'json');
-    if (chatIdKey === null) {
-        await kv.put(chat_id, JSON.stringify({ 'sign': signature, 'time': Date.now() }));
+    // 检查是否应该发送消息
+    if ((hsNtfy.counts?.unread === 0) && (hsNtfy.counts?.missed_calls === 0 || hsNtfy.counts?.missed_calls === undefined)) {
+        return 'nothing';
     }
 
-    // 检查是否应该发送消息
-    if ((hsNtfy.counts?.unread === 0 || hsNtfy.counts?.unread === 1) && (hsNtfy.counts?.missed_calls === 0 || hsNtfy.counts?.missed_calls === undefined)) {
-        return 'nothing';
+    if ((hsNtfy.counts?.unread === 1) && (hsNtfy.counts?.missed_calls === 0 || hsNtfy.counts?.missed_calls === undefined)) {
+        if (timeDiff < 600000) { // 10 分钟内不发送
+            if (timeDiff > 540000) { // 离 10 分钟不足 1 分钟时更新时间
+                await kv.put(chat_id, JSON.stringify({ sign: expectedSign, time: Date.now() }));
+            }
+            return 'nothing';
+        }
     }
 
     return chat_id;
