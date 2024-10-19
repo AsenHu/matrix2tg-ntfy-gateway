@@ -1,5 +1,3 @@
-import sha256 from 'crypto-js/sha256';
-
 interface Env {
     kv: KVNamespace;
     baseAPI: string;
