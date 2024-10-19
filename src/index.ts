@@ -124,6 +124,7 @@ async function checkShouldSend(app_id: string, pushkey: string, token: string, h
         }
     }
 
+    await kv.put(chat_id, JSON.stringify({ sign: expectedSign, time: Date.now() }));
     return chat_id;
 }
 
