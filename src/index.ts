@@ -124,7 +124,9 @@ async function checkShouldSend(app_id: string, pushkey: string, token: string, h
         }
     }
 
-    await kv.put(chat_id, JSON.stringify({ sign: expectedSign, time: Date.now() }));
+    if (timeDiff > 540000) { // 如果时间即将到达 10 分钟，更新时间
+        await kv.put(chat_id, JSON.stringify({ sign: expectedSign, time: Date.now() }));
+    }
     return chat_id;
 }
 
