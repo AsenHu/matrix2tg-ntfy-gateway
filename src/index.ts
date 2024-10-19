@@ -1,7 +1,5 @@
-import sha256 from 'crypto-js/sha256';
-
 interface Env {
-    BINDING_NAME: KVNamespace;
+    kv: KVNamespace;
     baseAPI: string;
     token: string;
 }
@@ -23,6 +21,11 @@ interface Notification {
     devices: Array<{ app_id: string; pushkey: string; }>;
 }
 
+interface ChatIdKey {
+    sign: string;
+    time: number;
+}
+
 export default {
     async fetch(request: Request, env: Env) {
         // 读取请求的内容
@@ -40,7 +43,7 @@ export default {
             const pushkey = element.pushkey;
 
             // 使用 await 发送消息，返回错误的 pushkey
-            const errorPushkey = await sendMessage(app_id, pushkey, textPromise, url, env.token, hsNtfy);
+            const errorPushkey = await sendMessage(app_id, pushkey, textPromise, url, env.token, hsNtfy, env.kv);
             return errorPushkey; // 直接返回发送结果
         });
 
@@ -78,14 +81,14 @@ async function generateNotificationText(notification: Notification) {
     return safeText;
 }
 
-function checkShouldSend(app_id: string, pushkey: string, token: string, hsNtfy: Notification) {
+async function checkShouldSend(app_id: string, pushkey: string, token: string, hsNtfy: Notification, kv: KVNamespace) {
     // 检查 app_id
     const expectedAppId = 'chat.nekos.tgntfy';
     if (app_id !== expectedAppId) {
         return 'reject';
     }
 
-    // 检查签名
+    // 分割 chat_id 和 signature
     const regex = /^([^:]+):([^:]+)$/; // 匹配格式为 chat_id:single_chat_id
     const match = pushkey.match(regex);
     if (!match) {
@@ -93,22 +96,38 @@ function checkShouldSend(app_id: string, pushkey: string, token: string, hsNtfy:
     }
     const chat_id = match[1];
     const signature = match[2];
-    const expectedSign = sha256(chat_id + token).toString();
+    // KV 存储检查签名
+    const chatIdKey: ChatIdKey | null = await kv.get(chat_id, 'json');
+    if (chatIdKey === null) {
+        return 'reject';
+    }
+    const expectedSign = chatIdKey.sign;
+    const lastSendTime = chatIdKey.time;
+    const timeDiff = Date.now() - lastSendTime;
     if (signature !== expectedSign) {
         return 'reject';
     }
 
     // 检查是否应该发送消息
-    if ((hsNtfy.counts?.unread === 0 || hsNtfy.counts?.unread === 1) && (hsNtfy.counts?.missed_calls === 0 || hsNtfy.counts?.missed_calls === undefined)) {
+    if ((hsNtfy.counts?.unread === 0) && (hsNtfy.counts?.missed_calls === 0 || hsNtfy.counts?.missed_calls === undefined)) {
         return 'nothing';
+    }
+
+    if ((hsNtfy.counts?.unread === 1) && (hsNtfy.counts?.missed_calls === 0 || hsNtfy.counts?.missed_calls === undefined)) {
+        if (timeDiff < 600000) { // 10 分钟内不发送
+            if (timeDiff > 540000) { // 离 10 分钟不足 1 分钟时更新时间
+                await kv.put(chat_id, JSON.stringify({ sign: expectedSign, time: Date.now() }));
+            }
+            return 'nothing';
+        }
     }
 
     return chat_id;
 }
 
-async function sendMessage(app_id: string, pushkey: string, promiseText: Promise<string>, url: string, token: string, hsNtfy: Notification) {
+async function sendMessage(app_id: string, pushkey: string, promiseText: Promise<string>, url: string, token: string, hsNtfy: Notification, kv: KVNamespace) {
     // 检查是否应该发送消息并获取 chat_id
-    const action = checkShouldSend(app_id, pushkey, token, hsNtfy);
+    const action = await checkShouldSend(app_id, pushkey, token, hsNtfy, kv);
     if (action === 'nothing') {
         return;
     }
