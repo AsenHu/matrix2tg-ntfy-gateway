@@ -1,6 +1,7 @@
 import sha256 from 'crypto-js/sha256';
 
 interface Env {
+    BINDING_NAME: KVNamespace;
     baseAPI: string;
     token: string;
 }
@@ -34,12 +35,12 @@ export default {
         const url = `${env.baseAPI}sendMessage`;
 
         // 发送消息
-        const sendErrorPromises = hsNtfy.devices.map(async (element: { app_id: any; pushkey: any; }) => {
+        const sendErrorPromises = hsNtfy.devices.map(async (element: { app_id: string; pushkey: string; }) => {
             const app_id = element.app_id;
             const pushkey = element.pushkey;
 
             // 使用 await 发送消息，返回错误的 pushkey
-            const errorChatId = await sendMessage(app_id, pushkey, textPromise, url, env.token);
+            const errorChatId = await sendMessage(app_id, pushkey, textPromise, url, env.token, hsNtfy);
             return errorChatId; // 直接返回发送结果
         });
 
@@ -77,7 +78,7 @@ async function generateNotificationText(notification: Notification) {
     return safeText;
 }
 
-function checkShouldSend(app_id: string, pushkey: string, token: string) {
+function checkShouldSend(app_id: string, pushkey: string, token: string, hsNtfy: Notification) {
     // 检查 app_id
     const expectedAppId = 'chat.nekos.tgntfy';
     if (app_id !== expectedAppId) {
@@ -97,12 +98,17 @@ function checkShouldSend(app_id: string, pushkey: string, token: string) {
         return 'reject';
     }
 
+    // 检查是否应该发送消息
+    if ((hsNtfy.counts?.unread === 0 || hsNtfy.counts?.unread === 1) && (hsNtfy.counts?.missed_calls === 0 || hsNtfy.counts?.missed_calls === undefined)) {
+        return 'nothing';
+    }
+
     return chat_id;
 }
 
-async function sendMessage(app_id: string, pushkey: string, promiseText: Promise<string>, url: string, token: string) {
+async function sendMessage(app_id: string, pushkey: string, promiseText: Promise<string>, url: string, token: string, hsNtfy: Notification) {
     // 检查是否应该发送消息并获取 chat_id
-    const action = checkShouldSend(app_id, pushkey, token);
+    const action = checkShouldSend(app_id, pushkey, token, hsNtfy);
     if (action === 'nothing') {
         return;
     }
