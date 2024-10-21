@@ -51,9 +51,9 @@ export default {
 
         // 使用 filter 方法过滤掉空字符串、null 和 undefined
         const sendError = sendErrorResults.filter((pushkey: string | undefined) => pushkey);
-        console.log('sendError', sendError);
 
         const responseMsg = { "rejected": sendError };
+        console.log('Response:', responseMsg);
         return Response.json(responseMsg);
     },
 };
@@ -99,10 +99,12 @@ async function checkShouldSend(app_id: string, pushkey: string, token: string, h
     console.log('KV GET', chat_id);
     const chatIdKey: ChatIdKey | null = await kv.get(chat_id, 'json');
     if (chatIdKey === null) {
+        console.warn('Error: Invalid chat_id' + chat_id);
         return 'reject';
     }
     const expectedSign = chatIdKey.sign;
     const lastSendTime = chatIdKey.time;
+    console.log('lastSendTime', lastSendTime);
     const timeDiff = Date.now() - lastSendTime;
     if (signature !== expectedSign) {
         return 'reject';
@@ -137,6 +139,7 @@ async function sendMessage(app_id: string, pushkey: string, promiseText: Promise
         return;
     }
     if (action === 'reject') {
+        console.warn('Error: Invalid pushkey' + pushkey);
         return pushkey;
     }
     const chat_id = action;
@@ -155,15 +158,13 @@ async function sendMessage(app_id: string, pushkey: string, promiseText: Promise
         body: JSON.stringify(payload),
     });
 
-    if (response.status !== 200) {
-        return pushkey; // 如果状态码不是 200，返回 pushkey
-    }
-
     // 解析响应 JSON
     const jsonResponse = await response.json() as { ok: boolean };
 
     // 检查响应内容是否包含 { "ok": "true" }
     if (jsonResponse.ok !== true) {
+        console.warn('Error:', jsonResponse);
+        console.warn('pushkey:' + pushkey);
         return pushkey; // 如果响应里没有 { "ok": "true" }，返回 pushkey
     }
 }
