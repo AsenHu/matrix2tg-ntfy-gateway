@@ -31,6 +31,7 @@ export default {
         // 读取请求的内容
         const requestBody: { notification: Notification } = await request.json();
         const hsNtfy = requestBody.notification;
+        console.log('Accept Request', hsNtfy);
 
         // 拼接字符串
         const textPromise = generateNotificationText(hsNtfy);
@@ -53,7 +54,7 @@ export default {
         const sendError = sendErrorResults.filter((pushkey: string | undefined) => pushkey);
 
         const responseMsg = { "rejected": sendError };
-        console.log('Response:', responseMsg);
+        console.log('Response', responseMsg);
         return Response.json(responseMsg);
     },
 };
@@ -99,7 +100,7 @@ async function checkShouldSend(app_id: string, pushkey: string, token: string, h
     console.log('KV GET', chat_id);
     const chatIdKey: ChatIdKey | null = await kv.get(chat_id, 'json');
     if (chatIdKey === null) {
-        console.warn('Error: Invalid chat_id' + chat_id);
+        console.warn('Error: Invalid chat_id', chat_id);
         return 'reject';
     }
     const expectedSign = chatIdKey.sign;
@@ -139,7 +140,7 @@ async function sendMessage(app_id: string, pushkey: string, promiseText: Promise
         return;
     }
     if (action === 'reject') {
-        console.warn('Error: Invalid pushkey' + pushkey);
+        console.warn('Error: Invalid pushkey', pushkey);
         return pushkey;
     }
     const chat_id = action;
@@ -164,7 +165,7 @@ async function sendMessage(app_id: string, pushkey: string, promiseText: Promise
     // 检查响应内容是否包含 { "ok": "true" }
     if (jsonResponse.ok !== true) {
         console.warn('Error:', jsonResponse);
-        console.warn('pushkey:' + pushkey);
+        console.warn('pushkey:', pushkey);
         return pushkey; // 如果响应里没有 { "ok": "true" }，返回 pushkey
     }
 }
