@@ -31,7 +31,6 @@ export default {
         // 读取请求的内容
         const requestBody: { notification: Notification } = await request.json();
         const hsNtfy = requestBody.notification;
-        console.log(hsNtfy)
 
         // 拼接字符串
         const textPromise = generateNotificationText(hsNtfy);
@@ -54,6 +53,7 @@ export default {
         const sendError = sendErrorResults.filter((pushkey: string | undefined) => pushkey);
 
         const responseMsg = { "rejected": sendError };
+        console.log('Response:', responseMsg);
         return Response.json(responseMsg);
     },
 };
@@ -77,7 +77,6 @@ async function generateNotificationText(notification: Notification) {
         messageText += `\n[matrix.to](https://matrix.to/#/${notification.room_id}/${notification.event_id})`;
     }
     const safeText = messageText.replace(/[.!]/g, (match: string) => `\\${match}`).trim();
-    console.log(safeText)
     return safeText;
 }
 
@@ -97,12 +96,15 @@ async function checkShouldSend(app_id: string, pushkey: string, token: string, h
     const chat_id = match[1];
     const signature = match[2];
     // KV 存储检查签名
+    console.log('KV GET', chat_id);
     const chatIdKey: ChatIdKey | null = await kv.get(chat_id, 'json');
     if (chatIdKey === null) {
+        console.warn('Error: Invalid chat_id' + chat_id);
         return 'reject';
     }
     const expectedSign = chatIdKey.sign;
     const lastSendTime = chatIdKey.time;
+    console.log('lastSendTime', lastSendTime);
     const timeDiff = Date.now() - lastSendTime;
     if (signature !== expectedSign) {
         return 'reject';
@@ -116,6 +118,7 @@ async function checkShouldSend(app_id: string, pushkey: string, token: string, h
     if ((hsNtfy.counts?.unread === 1) && (hsNtfy.counts?.missed_calls === 0 || hsNtfy.counts?.missed_calls === undefined)) {
         if (timeDiff < 600000) { // 10 分钟内不发送
             if (timeDiff > 540000) { // 离 10 分钟不足 1 分钟时更新时间
+                console.log('KV PUT', chat_id);
                 await kv.put(chat_id, JSON.stringify({ sign: expectedSign, time: Date.now() }));
             }
             return 'nothing';
@@ -123,6 +126,7 @@ async function checkShouldSend(app_id: string, pushkey: string, token: string, h
     }
 
     if (timeDiff > 540000) { // 如果时间即将到达 10 分钟，更新时间
+        console.log('KV PUT', chat_id);
         await kv.put(chat_id, JSON.stringify({ sign: expectedSign, time: Date.now() }));
     }
     return chat_id;
@@ -135,6 +139,7 @@ async function sendMessage(app_id: string, pushkey: string, promiseText: Promise
         return;
     }
     if (action === 'reject') {
+        console.warn('Error: Invalid pushkey' + pushkey);
         return pushkey;
     }
     const chat_id = action;
@@ -153,15 +158,13 @@ async function sendMessage(app_id: string, pushkey: string, promiseText: Promise
         body: JSON.stringify(payload),
     });
 
-    if (response.status !== 200) {
-        return pushkey; // 如果状态码不是 200，返回 pushkey
-    }
-
     // 解析响应 JSON
     const jsonResponse = await response.json() as { ok: boolean };
 
     // 检查响应内容是否包含 { "ok": "true" }
     if (jsonResponse.ok !== true) {
+        console.warn('Error:', jsonResponse);
+        console.warn('pushkey:' + pushkey);
         return pushkey; // 如果响应里没有 { "ok": "true" }，返回 pushkey
     }
 }
