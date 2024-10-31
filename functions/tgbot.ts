@@ -13,13 +13,13 @@ interface TGjson {
 }
 
 
-export const onRequestPost = async (request: Request, env: Env) => {
+export const onRequestPost = async (context: { request: Request, env: Env }) => {
     // 读取请求
-    const tgjson: TGjson = await request.json();
+    const tgjson: TGjson = await context.request.json();
     console.log(tgjson);
 
     // 准备端点
-    const API = `${env.baseAPI}sendMessage`;
+    const API = `${context.env.baseAPI}sendMessage`;
 
     // 提取消息
     const text = tgjson.message?.text || '';
@@ -37,7 +37,7 @@ export const onRequestPost = async (request: Request, env: Env) => {
         const sendPromise = sendMsg(API, send, chatid);
 
         // 保存 pushkey
-        await env.kv.put(chatid, JSON.stringify({ 'sign': signature, 'time': 0 }));
+        await context.env.kv.put(chatid, JSON.stringify({ 'sign': signature, 'time': 0 }));
         await sendPromise;
         return new Response(null);
     }
@@ -45,7 +45,7 @@ export const onRequestPost = async (request: Request, env: Env) => {
     if (text === '/stop') {
         const send = `你的 pushkey 已停用\n如果想重新生成请发送 /start`;
         const sendPromise = sendMsg(API, send, chatid);
-        await env.kv.delete(chatid);
+        await context.env.kv.delete(chatid);
         await sendPromise;
         return new Response(null);
     }
