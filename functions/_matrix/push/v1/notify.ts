@@ -25,15 +25,15 @@ interface ChatIdKey {
     time: number;
 }
 
-export const onRequestPost = async (request: Request, env: Env) => {
+export const onRequestPost = async (context: { request: Request, env: Env }) => {
     // 读取请求的内容
-    const requestBody: { notification: Notification } = await request.json();
+    const requestBody: { notification: Notification } = await context.request.json();
     const hsNtfy = requestBody.notification;
     console.log('Accept Request', hsNtfy);
 
     // 拼接字符串
     const textPromise = generateNotificationText(hsNtfy);
-    const url = `${env.baseAPI}sendMessage`;
+    const url = `${context.env.baseAPI}sendMessage`;
 
     // 发送消息
     const sendErrorPromises = hsNtfy.devices.map(async (element: { app_id: string; pushkey: string; }) => {
@@ -41,7 +41,7 @@ export const onRequestPost = async (request: Request, env: Env) => {
         const pushkey = element.pushkey;
 
         // 使用 await 发送消息，返回错误的 pushkey
-        const errorPushkey = await sendMessage(app_id, pushkey, textPromise, url, hsNtfy, env.kv);
+        const errorPushkey = await sendMessage(app_id, pushkey, textPromise, url, hsNtfy, context.env.kv);
         return errorPushkey; // 直接返回发送结果
     });
 
