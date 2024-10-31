@@ -1,11 +1,10 @@
 interface Env {
     kv: KVNamespace;
     baseAPI: string;
-    token: string;
 }
 
 interface Notification {
-    content: {
+    content?: {
         body?: string;
     };
     event_id?: string;
@@ -26,38 +25,37 @@ interface ChatIdKey {
     time: number;
 }
 
-export default {
-    async fetch(request: Request, env: Env) {
-        // 读取请求的内容
-        const requestBody: { notification: Notification } = await request.json();
-        const hsNtfy = requestBody.notification;
-        console.log('Accept Request', hsNtfy);
+export const onRequestPost = async (request: Request, env: Env) => {
+    // 读取请求的内容
+    const requestBody: { notification: Notification } = await request.json();
+    const hsNtfy = requestBody.notification;
+    console.log('Accept Request', hsNtfy);
 
-        // 拼接字符串
-        const textPromise = generateNotificationText(hsNtfy);
-        const url = `${env.baseAPI}sendMessage`;
+    // 拼接字符串
+    const textPromise = generateNotificationText(hsNtfy);
+    const url = `${env.baseAPI}sendMessage`;
 
-        // 发送消息
-        const sendErrorPromises = hsNtfy.devices.map(async (element: { app_id: string; pushkey: string; }) => {
-            const app_id = element.app_id;
-            const pushkey = element.pushkey;
+    // 发送消息
+    const sendErrorPromises = hsNtfy.devices.map(async (element: { app_id: string; pushkey: string; }) => {
+        const app_id = element.app_id;
+        const pushkey = element.pushkey;
 
-            // 使用 await 发送消息，返回错误的 pushkey
-            const errorPushkey = await sendMessage(app_id, pushkey, textPromise, url, env.token, hsNtfy, env.kv);
-            return errorPushkey; // 直接返回发送结果
-        });
+        // 使用 await 发送消息，返回错误的 pushkey
+        const errorPushkey = await sendMessage(app_id, pushkey, textPromise, url, hsNtfy, env.kv);
+        return errorPushkey; // 直接返回发送结果
+    });
 
-        // 使用 Promise.all 来等待所有发送消息任务完成
-        const sendErrorResults = await Promise.all(sendErrorPromises);
+    // 使用 Promise.all 来等待所有发送消息任务完成
+    const sendErrorResults = await Promise.all(sendErrorPromises);
 
-        // 使用 filter 方法过滤掉空字符串、null 和 undefined
-        const sendError = sendErrorResults.filter((pushkey: string | undefined) => pushkey);
+    // 使用 filter 方法过滤掉空字符串、null 和 undefined
+    const sendError = sendErrorResults.filter((pushkey: string | undefined) => pushkey);
 
-        const responseMsg = { "rejected": sendError };
-        console.log('Response', responseMsg);
-        return Response.json(responseMsg);
-    },
-};
+    const responseMsg = { "rejected": sendError };
+    console.log('Response', responseMsg);
+    return Response.json(responseMsg);
+}
+
 
 async function generateNotificationText(notification: Notification) {
     const content = notification.content || {};
@@ -81,7 +79,7 @@ async function generateNotificationText(notification: Notification) {
     return safeText;
 }
 
-async function checkShouldSend(app_id: string, pushkey: string, token: string, hsNtfy: Notification, kv: KVNamespace) {
+async function checkShouldSend(app_id: string, pushkey: string, hsNtfy: Notification, kv: KVNamespace) {
     // 检查 app_id
     const expectedAppId = 'chat.nekos.tgntfy';
     if (app_id !== expectedAppId) {
@@ -133,9 +131,9 @@ async function checkShouldSend(app_id: string, pushkey: string, token: string, h
     return chat_id;
 }
 
-async function sendMessage(app_id: string, pushkey: string, promiseText: Promise<string>, url: string, token: string, hsNtfy: Notification, kv: KVNamespace) {
+async function sendMessage(app_id: string, pushkey: string, promiseText: Promise<string>, url: string, hsNtfy: Notification, kv: KVNamespace) {
     // 检查是否应该发送消息并获取 chat_id
-    const action = await checkShouldSend(app_id, pushkey, token, hsNtfy, kv);
+    const action = await checkShouldSend(app_id, pushkey, hsNtfy, kv);
     if (action === 'nothing') {
         return;
     }
