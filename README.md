@@ -37,6 +37,3 @@ A: 如果你写过 cf worker 就知道如何部署。以后学业压力小了可
 
 Q: 英文版？
 A: 海外用户手机那消息推送工作的一个比一个好，他们多半不需要这玩意。因此，以后会写。
-
-Q: 获取 pushkey 的机器人的代码在哪？
-A: [AsenHu/tg-webhook-pushkey](https://github.com/AsenHu/tg-webhook-pushkey)
